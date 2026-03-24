@@ -9,7 +9,7 @@ const pick=a=>a[Math.floor(Math.random()*a.length)];
 function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
 function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
 
-const SHARE_URL='https://www.perplexity.ai/computer/a/bankerx-wealthquest-2NF0O82kTZGfLh_R_8GH5w';
+const SHARE_URL='https://www.perplexity.ai/computer/a/wealthquest-2NF0O82kTZGfLh_R_8GH5w';
 
 /* ===== TRADING FEE CONFIG ===== */
 const TRADING_FEE_RATE=0.015; // 1.5% of traded amount (brokerage, spread, STT & timing costs)
@@ -322,8 +322,7 @@ function newGame(horizon){
     portfolio:{eq:3000,bond:1500,cash:500,fd:2000,crypto:2000,gamble:1000},
     history:[10000], yearReturns:[], events:[], decisions:[],
     aiScores:AI_PLAYERS.map(p=>({...p,nw:10000})),
-    totalContrib:0, yearNotes:[], totalFees:0,
-    firstAlloc:null // captured after first advance
+    totalContrib:0, yearNotes:[], totalFees:0
   };
   renderGame();
 }
@@ -459,7 +458,6 @@ function pickDecision(){
 function benchmarks(){
   const start=10000, inc=1500;
   const mixes=[
-    {label:'60/40 Balanced (Stocks/Bonds)',eq:.6,bond:.4,other:0},
     {label:'100% Stocks Only',eq:1,bond:0,other:0},
     {label:'90/10 Stocks & Crypto',eq:.9,bond:0,other:.1}
   ];
@@ -473,21 +471,18 @@ function benchmarks(){
   });
 }
 
-/* Buy & hold benchmark — uses the player's FIRST round allocation, no rebalancing, no fees */
-function buyAndHold(){
+/* 60/40 benchmark — classic balanced portfolio using actual game-year returns, no fees */
+function sixtyForty(){
   const start=10000, inc=1500;
-  // Use player's first-round allocation weights (captured at first advance)
-  const fa=G.firstAlloc||{eq:30,bond:15,cash:5,fd:20,crypto:20,gamble:10};
-  const total=AKEYS.reduce((s,k)=>s+fa[k],0)||100;
-  const w={}; AKEYS.forEach(k=>{w[k]=fa[k]/total});
   let v=start;
   for(let i=0;i<G.turn;i++){
-    let blendedR=0;
-    for(const k of AKEYS){
-      const yr=G.yearReturns[i];
-      if(yr)blendedR+=w[k]*(yr[k]||0);
+    const yr=G.yearReturns[i];
+    if(yr){
+      const blendedR=0.6*(yr.eq||0)+0.4*(yr.bond||0);
+      v=v*(1+blendedR)+inc;
+    } else {
+      v+=inc;
     }
-    v=v*(1+blendedR)+inc;
   }
   return Math.round(v);
 }
@@ -654,8 +649,7 @@ function renderGame(){
   }else{
     $('btn-go').onclick=()=>{
       if(AKEYS.reduce((s,k)=>s+G.alloc[k],0)!==100)return;
-      // Capture first-round allocation for buy & hold benchmark
-      if(!G.firstAlloc) G.firstAlloc={...G.alloc};
+
       const pTotal=Object.values(G.portfolio).reduce((a,b)=>a+b,0);
       AKEYS.forEach(k=>{G.portfolio[k]=pTotal*(G.alloc[k]/100)});
       const result=simYear();
@@ -842,8 +836,8 @@ function renderFinalResults(){
   const ear=annRet*100;
   const bench=benchmarks();
   const score=calcScore(nw,sh);
-  const bnh=buyAndHold();
-  const beatBnH=nw>bnh;
+  const sf=sixtyForty();
+  const beatSF=nw>sf;
 
   // Save best score
   saveBestScore({score,nw:Math.round(nw),horizon:G.horizon,date:new Date().toISOString().slice(0,10)});
@@ -860,9 +854,9 @@ function renderFinalResults(){
     {name:'You',emoji:'🎮',nw:Math.round(nw),you:true}];
   players.sort((a,b)=>b.nw-a.nw);
 
-  // Buy & hold comparison
-  const bnhDiff=nw-bnh;
-  const bnhPct=((nw/bnh)-1)*100;
+  // 60/40 comparison
+  const sfDiff=nw-sf;
+  const sfPct=((nw/sf)-1)*100;
 
   app.innerHTML=`
   <div class="screen results-screen">
@@ -879,11 +873,11 @@ function renderFinalResults(){
         </div>
       </div>
 
-      <div class="bnh-card ${beatBnH?'beat':'lost'}">
-        <div class="bnh-icon">${beatBnH?'🎯':'📉'}</div>
+      <div class="bnh-card ${beatSF?'beat':'lost'}">
+        <div class="bnh-icon">${beatSF?'🎯':'📉'}</div>
         <div class="bnh-body">
-          <div class="bnh-title">You ${beatBnH?'outperformed':'underperformed'} a simple buy & hold strategy</div>
-          <div class="bnh-detail">Buy & hold means keeping your Year 1 allocation and never changing it — no rebalancing, no fees. That would have returned ${R(bnh)}. You ${beatBnH?'beat':'trailed'} it by ${R(Math.abs(bnhDiff))} (${bnhPct>=0?'+':''}${bnhPct.toFixed(1)}%).${G.totalFees>0?' Total trading fees paid: '+R(G.totalFees)+'.':''}</div>
+          <div class="bnh-title">You ${beatSF?'outperformed':'underperformed'} a classic 60/40 portfolio</div>
+          <div class="bnh-detail">A 60/40 portfolio puts 60% in stocks and 40% in bonds — the most common balanced strategy. It would have returned ${R(sf)}. You ${beatSF?'beat':'trailed'} it by ${R(Math.abs(sfDiff))} (${sfPct>=0?'+':''}${sfPct.toFixed(1)}%).${G.totalFees>0?' Total trading fees paid: '+R(G.totalFees)+'.':''}</div>
         </div>
       </div>
 
@@ -918,7 +912,7 @@ function renderFinalResults(){
       <div class="bench-card">
         <div class="bench-title">📊 How You Compare</div>
         <div class="bench-row"><div class="bench-label">Your Result</div><div class="bench-val" style="color:var(--g)">${R(nw)}</div></div>
-        <div class="bench-row"><div class="bench-label">Buy & Hold (No Changes)</div><div class="bench-val" style="color:var(--y)">${R(bnh)}</div></div>
+        <div class="bench-row"><div class="bench-label">60/40 Balanced (Stocks/Bonds)</div><div class="bench-val" style="color:var(--y)">${R(sf)}</div></div>
         ${bench.map(b=>`<div class="bench-row"><div class="bench-label">${b.label}</div><div class="bench-val" style="color:var(--b)">${R(b.value)}</div></div>`).join('')}
       </div>
 
