@@ -1,4 +1,4 @@
-/* BANKERX WealthQuest — Final Build */
+/* BANKERX WealthQuest — v4 */
 (function(){
 const $=id=>document.getElementById(id);
 const app=document.getElementById('app');
@@ -11,31 +11,46 @@ function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
 
 const SHARE_URL='https://www.perplexity.ai/computer/a/bankerx-wealthquest-2NF0O82kTZGfLh_R_8GH5w';
 
+/* ===== TRADING FEE CONFIG ===== */
+const TRADING_FEE_RATE=0.005; // 0.5% of traded amount (realistic brokerage + spread)
+
 /* ===== ASSET PROFILES (SA market performance) ===== */
 const ASSETS={
   eq:{name:'Stocks',icon:'📈',color:'#4a9ef0',cls:'eq',
     mean:.12,vol:.17,min:-.35,max:.42,
-    desc:'Index Funds & ETFs',risk:'High risk'},
+    desc:'ETFs & Index funds',risk:'High risk',riskScore:3},
   bond:{name:'Bonds',icon:'🏛️',color:'#c070ff',cls:'bond',
     mean:.095,vol:.04,min:-.05,max:.16,
-    desc:'Government bonds',risk:'Low-med risk'},
+    desc:'Government bonds',risk:'Low-med risk',riskScore:1},
   cash:{name:'Cash',icon:'💵',color:'#8888a0',cls:'cash',
     mean:0,vol:.005,min:-.08,max:.01,
-    desc:'Loses value to inflation',risk:'Inflation risk'},
+    desc:'In case of emergency',risk:'Inflation risk',riskScore:0},
   fd:{name:'Savings',icon:'🏦',color:'#00ddff',cls:'fd',
     mean:.075,vol:.01,min:.04,max:.10,
-    desc:'Fixed deposits',risk:'Low risk'},
+    desc:'Fixed deposits',risk:'Low risk',riskScore:0.5},
   crypto:{name:'Crypto',icon:'₿',color:'#ff8844',cls:'crypto',
     mean:.20,vol:.60,min:-.70,max:3.0,
-    desc:'Bitcoin, Ethereum & altcoins',risk:'Extreme risk'},
+    desc:'Bitcoin, Ethereum & altcoins',risk:'Extreme risk',riskScore:5},
   gamble:{name:'Gambling',icon:'🎰',color:'#ff3355',cls:'gamble',
     mean:-.12,vol:.50,min:-.90,max:4.0,
-    desc:'The house always wins',risk:'Negative EV'}
+    desc:'The house always wins',risk:'Negative EV',riskScore:6}
 };
 const AKEYS=Object.keys(ASSETS);
 
 /* SA inflation ~5-6% */
 const SA_INFLATION=.055;
+
+/* ===== RISK PROFILE CALCULATOR ===== */
+function calcRiskProfile(alloc){
+  const total=AKEYS.reduce((s,k)=>s+alloc[k],0)||100;
+  const score=AKEYS.reduce((s,k)=>s+(alloc[k]/total)*ASSETS[k].riskScore,0);
+  // Score 0-1: ultra conservative, 1-2: conservative, 2-3: balanced, 3-4: risky, 4+: extremely risky
+  if(score<=0.8) return{label:'Ultra Conservative',color:'#4a9ef0',emoji:'🛡️'};
+  if(score<=1.6) return{label:'Conservative',color:'#00ddff',emoji:'🧘'};
+  if(score<=2.5) return{label:'Balanced',color:'var(--g)',emoji:'⚖️'};
+  if(score<=3.5) return{label:'Risky',color:'var(--orange)',emoji:'⚡'};
+  return{label:'Extremely Risky',color:'var(--r)',emoji:'🔥'};
+}
 
 /* ===== YEAR NARRATIVES PER ASSET ===== */
 const YEAR_NOTES={
@@ -105,47 +120,48 @@ const EVENTS=[
     desc:'World economy contracts. Fear grips markets.'}
 ];
 
-/* ===== IN-GAME DECISIONS (escalating risk each year) ===== */
+/* ===== IN-GAME DECISIONS (escalating risk, realistic outcomes) ===== */
+/* Penny stocks, gambles, and speculative bets lose money MOST of the time */
 const DECISIONS_BY_RISK=[
   /* Low risk — early years */
   [
     {emoji:'📊',title:'Index Fund Switch',desc:'Switch to a low-cost global ETF for better diversification?',risk:'low',
-      yesCost:0,yesAsset:'eq',yesReturn:[.03,.10],lesson:'Low-cost index funds outperform most active managers.'},
+      yesCost:0,yesAsset:'eq',yesReturn:[.03,.10],loseProb:.15,lesson:'Low-cost index funds outperform most active managers.'},
     {emoji:'🏦',title:'Fixed Deposit Special',desc:'Bank offering 9.5% fixed deposit for 12 months. Lock in R500?',risk:'low',
-      yesCost:500,yesAsset:'fd',yesReturn:[.085,.10],lesson:'Fixed deposits are safe and predictable.'},
+      yesCost:500,yesAsset:'fd',yesReturn:[.085,.10],loseProb:.05,lesson:'Fixed deposits are safe and predictable.'},
     {emoji:'⚡',title:'Eskom Bond',desc:'Government-backed Eskom bond paying 11%. Invest R400?',risk:'low',
-      yesCost:400,yesAsset:'bond',yesReturn:[.09,.12],lesson:'Government-backed bonds are safer, but carry credit risk.'}
+      yesCost:400,yesAsset:'bond',yesReturn:[.09,.12],loseProb:.10,lesson:'Government-backed bonds are safer, but carry credit risk.'}
   ],
   /* Medium risk — mid years */
   [
     {emoji:'🏢',title:'Hot IPO Alert!',desc:'A new fintech company listed on the JSE. Subscribe for R500?',risk:'med',
-      yesCost:500,yesAsset:'eq',yesReturn:[-.20,.60],lesson:'IPOs are exciting but risky. Most underperform in year one.'},
+      yesCost:500,yesAsset:'eq',yesReturn:[-.20,.60],loseProb:.45,lesson:'IPOs are exciting but risky. Most underperform in year one.'},
     {emoji:'🏠',title:'Property REIT',desc:'A SA property fund offers 8% dividends. Invest R600?',risk:'med',
-      yesCost:600,yesAsset:'eq',yesReturn:[-.08,.18],lesson:'REITs offer steady income but are rate-sensitive.'},
+      yesCost:600,yesAsset:'eq',yesReturn:[-.08,.18],loseProb:.30,lesson:'REITs offer steady income but are rate-sensitive.'},
     {emoji:'💎',title:'Crypto Staking',desc:'Stake your crypto for 15% APY. Locks funds for 6 months.',risk:'med',
-      yesCost:0,yesAsset:'crypto',yesReturn:[.05,.20],lesson:'Staking earns yield, but lock-ups add liquidity risk.'}
+      yesCost:0,yesAsset:'crypto',yesReturn:[-.15,.20],loseProb:.35,lesson:'Staking earns yield, but lock-ups add liquidity risk.'}
   ],
-  /* High risk — later years */
+  /* High risk — later years (lose more often than win) */
   [
     {emoji:'₿',title:'Meme Coin Opportunity',desc:'A viral meme coin is pumping 500%. Throw R400 at it?',risk:'high',
-      yesCost:400,yesAsset:'crypto',yesReturn:[-.80,5.0],lesson:'Meme coins are pure speculation. Most crash to zero.'},
+      yesCost:400,yesAsset:'crypto',yesReturn:[-.90,5.0],loseProb:.80,lesson:'Meme coins are pure speculation. Most crash to zero.'},
     {emoji:'⚽',title:'Weekend Football Bet',desc:'Your mate says Chiefs vs Pirates is a sure thing. Bet R500?',risk:'high',
-      yesCost:500,yesAsset:'gamble',yesReturn:[-.99,3.0],lesson:'Sports betting is entertainment, not investing.'},
+      yesCost:500,yesAsset:'gamble',yesReturn:[-.99,3.0],loseProb:.85,lesson:'Sports betting is entertainment, not investing.'},
     {emoji:'🎰',title:'Casino Night',desc:'Friends hitting the casino. Take R300 gambling money?',risk:'high',
-      yesCost:300,yesAsset:'gamble',yesReturn:[-.99,8.0],lesson:'Casino games have a built-in house edge.'}
+      yesCost:300,yesAsset:'gamble',yesReturn:[-.99,8.0],loseProb:.88,lesson:'Casino games have a built-in house edge.'}
   ],
-  /* Extreme risk — final years */
+  /* Extreme risk — final years (almost always lose) */
   [
     {emoji:'🎲',title:'Lotto Ticket Spree',desc:'Powerball jackpot is R120M! Buy R200 worth of tickets?',risk:'extreme',
-      yesCost:200,yesAsset:'gamble',yesReturn:[-.99,500],lesson:'Lotto odds are 1 in 42 million. Deeply negative expected value.'},
+      yesCost:200,yesAsset:'gamble',yesReturn:[-.99,500],loseProb:.97,lesson:'Lotto odds are 1 in 42 million. Deeply negative expected value.'},
     {emoji:'🔥',title:'Leveraged Crypto Trade',desc:'10x leverage on Bitcoin. Could double or lose everything. R800?',risk:'extreme',
-      yesCost:800,yesAsset:'crypto',yesReturn:[-.95,10],lesson:'Leverage amplifies gains AND losses. Most traders lose everything.'},
+      yesCost:800,yesAsset:'crypto',yesReturn:[-.95,10],loseProb:.85,lesson:'Leverage amplifies gains AND losses. Most traders lose everything.'},
     {emoji:'💰',title:'All-in on Penny Stock',desc:'A penny stock tip from a stranger online. Throw R600 at it?',risk:'extreme',
-      yesCost:600,yesAsset:'eq',yesReturn:[-.90,8.0],lesson:'Penny stocks are the most manipulated securities on the market.'}
+      yesCost:600,yesAsset:'eq',yesReturn:[-.95,8.0],loseProb:.90,lesson:'Penny stocks are the most manipulated securities on the market.'}
   ]
 ];
 
-/* ===== NEWS TICKER ITEMS ===== */
+/* ===== NEWS TICKER ITEMS (top banner) ===== */
 const TICKER_HEADLINES=[
   {sym:'JSE',text:'JSE All Share',dir:()=>Math.random()>.45?'up':'down',val:()=>(rand(.1,2.5)).toFixed(1)+'%'},
   {sym:'BTC',text:'Bitcoin',dir:()=>Math.random()>.5?'up':'down',val:()=>(rand(.5,8)).toFixed(1)+'%'},
@@ -159,28 +175,71 @@ const TICKER_HEADLINES=[
   {sym:'TOP40',text:'JSE Top 40',dir:()=>Math.random()>.45?'up':'down',val:()=>(rand(.1,2)).toFixed(1)+'%'},
 ];
 
-const SCROLLING_HEADLINES=[
-  {text:'SARB holds rates steady amid inflation concerns',type:'neu'},
-  {text:'JSE hits record high on commodity surge',type:'pos'},
-  {text:'Eskom announces Stage 4 load shedding',type:'neg'},
-  {text:'Bitcoin breaks $100K barrier',type:'pos'},
-  {text:'Rand weakens against dollar on political uncertainty',type:'neg'},
-  {text:'SA GDP growth beats expectations at 2.1%',type:'pos'},
-  {text:'Crypto exchange hacked — $50M stolen',type:'neg'},
-  {text:'Gold prices surge to all-time highs',type:'pos'},
-  {text:'Government bonds rally on rate cut signal',type:'pos'},
-  {text:'Tech stocks tumble on AI regulation fears',type:'neg'},
-  {text:'Naspers reports strong Tencent earnings',type:'pos'},
-  {text:'SA unemployment rises to 33%',type:'neg'},
-  {text:'Property market shows signs of recovery',type:'pos'},
-  {text:'Oil prices spike on Middle East tensions',type:'neg'},
-  {text:'Retail investors flood into ETFs',type:'pos'},
-  {text:'New fintech unicorn emerges from Cape Town',type:'pos'},
-  {text:'Gambling industry under new regulations',type:'neg'},
-  {text:'Fixed deposit rates climb above 9%',type:'pos'},
-  {text:'Crypto winter continues — altcoins crash',type:'neg'},
-  {text:'Platinum demand surges on hydrogen economy',type:'pos'},
-];
+/* ===== SCROLLING NEWS CAROUSEL =====
+   Mix of misleading noise, contradictory signals, and 1-2 potentially useful hints.
+   Designed to create uncertainty — hard to know what to trust.
+*/
+const NEWS_POOL={
+  // Misleading / noise (most of the carousel)
+  noise:[
+    {text:'Analysts divided on whether rate cuts will come this quarter',type:'neu'},
+    {text:'New study finds 90% of day traders lose money',type:'neu'},
+    {text:'Influencer claims next 100x crypto gem found',type:'neu'},
+    {text:'Financial advisor: "This time is different"',type:'neu'},
+    {text:'Retail investors panic selling — contrarian signal?',type:'neu'},
+    {text:'AI-generated trading signals gain popularity online',type:'neu'},
+    {text:'Property developer denies rumours of insolvency',type:'neg'},
+    {text:'Government to review pension fund regulations',type:'neu'},
+    {text:'Social media buzz around new meme coin launch',type:'pos'},
+    {text:'Fund manager predicts 40% crash — same as every year',type:'neg'},
+    {text:'Crypto influencer arrested for pump and dump scheme',type:'neg'},
+    {text:'"Buy the dip" trending on social media again',type:'pos'},
+    {text:'Experts disagree on gold outlook for next 12 months',type:'neu'},
+    {text:'Banks report record credit card debt levels',type:'neg'},
+    {text:'Hedge fund billionaire bets against SA markets',type:'neg'},
+    {text:'Small cap stocks quietly outperforming this month',type:'pos'},
+    {text:'New online casino promises "guaranteed returns"',type:'neg'},
+    {text:'Pension fund switches to passive index strategy',type:'pos'},
+    {text:'Inflation expectations higher than actual CPI data',type:'neu'},
+    {text:'Cryptocurrency regulation bill delayed until 2027',type:'neu'},
+    {text:'Tip from a friend: "Trust me, this stock will moon"',type:'pos'},
+    {text:'Market volatility index at highest level in 3 months',type:'neg'},
+    {text:'Financial literacy survey: most SA adults can\'t read a balance sheet',type:'neu'},
+    {text:'Forex traders warn of ZAR instability ahead of elections',type:'neg'},
+    {text:'Rumours of major tech IPO on JSE — unconfirmed',type:'pos'},
+    {text:'Global bond yields sending mixed signals to markets',type:'neu'},
+  ],
+  // Potentially useful (only 1-2 shown per round)
+  useful:[
+    {text:'SARB signals possible rate cut in next MPC meeting',type:'pos'},
+    {text:'JSE Top 40 earnings revisions trending upward',type:'pos'},
+    {text:'SA GDP contracts — recession risk growing',type:'neg'},
+    {text:'Bitcoin hash rate hits all-time high ahead of halving',type:'pos'},
+    {text:'Eskom secures emergency funding — load shedding eases',type:'pos'},
+    {text:'Global recession fears intensify on weak US data',type:'neg'},
+    {text:'Commodity prices surge on Chinese stimulus package',type:'pos'},
+    {text:'Fixed deposit rates quietly climbing above 10%',type:'pos'},
+    {text:'Crypto exchange liquidity drying up — warning sign',type:'neg'},
+    {text:'SA government bonds downgraded to junk by Fitch',type:'neg'},
+  ]
+};
+
+function generateNewsCarousel(){
+  // Pick 8-12 items: mostly noise, 1-2 useful
+  const count=Math.floor(rand(8,13));
+  const usefulCount=Math.floor(rand(1,3)); // 1 or 2 useful
+  const noiseCount=count-usefulCount;
+
+  const shuffledNoise=[...NEWS_POOL.noise].sort(()=>Math.random()-.5);
+  const shuffledUseful=[...NEWS_POOL.useful].sort(()=>Math.random()-.5);
+
+  const items=[];
+  for(let i=0;i<noiseCount&&i<shuffledNoise.length;i++) items.push(shuffledNoise[i]);
+  for(let i=0;i<usefulCount&&i<shuffledUseful.length;i++) items.push(shuffledUseful[i]);
+
+  // Shuffle so useful ones are hidden among noise
+  return items.sort(()=>Math.random()-.5);
+}
 
 /* ===== LEADERBOARD PLAYERS ===== */
 const AI_PLAYERS=[
@@ -213,26 +272,64 @@ function newGame(horizon){
   G={
     horizon, turn:0, capital:10000, salary:1500,
     alloc:{eq:30,bond:15,cash:5,fd:20,crypto:20,gamble:10},
+    prevAlloc:{eq:30,bond:15,cash:5,fd:20,crypto:20,gamble:10},
     portfolio:{eq:3000,bond:1500,cash:500,fd:2000,crypto:2000,gamble:1000},
     history:[10000], yearReturns:[], events:[], decisions:[],
     aiScores:AI_PLAYERS.map(p=>({...p,nw:10000})),
-    totalContrib:0, yearNotes:[]
+    totalContrib:0, yearNotes:[], totalFees:0
   };
   renderGame();
+}
+
+/* ===== CALCULATE TRADING FEES ===== */
+function calcTradingFees(){
+  // Fee based on the total amount being traded (rebalanced)
+  const pTotal=Object.values(G.portfolio).reduce((a,b)=>a+b,0);
+  const totalAlloc=AKEYS.reduce((s,k)=>s+G.alloc[k],0)||100;
+  let traded=0;
+  for(const k of AKEYS){
+    const currentPct=(G.portfolio[k]/pTotal)*100;
+    const targetPct=(G.alloc[k]/totalAlloc)*100;
+    const diff=Math.abs(targetPct-currentPct);
+    traded+=pTotal*(diff/100);
+  }
+  // Only half is actual trades (buy side = sell side)
+  const actualTraded=traded/2;
+  return actualTraded*TRADING_FEE_RATE;
+}
+
+function hasAllocChanged(){
+  return AKEYS.some(k=>G.alloc[k]!==G.prevAlloc[k]);
 }
 
 /* ===== SIMULATE YEAR ===== */
 function simYear(){
   G.turn++;
-  const result={event:null,decision:null,returns:{},notes:{}};
+  const result={event:null,decision:null,returns:{},notes:{},fees:0};
 
-  // 1) Pick macro event
+  // 1) Apply trading fees if allocation changed
+  if(hasAllocChanged()){
+    const fees=calcTradingFees();
+    result.fees=fees;
+    G.totalFees+=fees;
+    // Deduct fees proportionally from all positions
+    const pTotal=Object.values(G.portfolio).reduce((a,b)=>a+b,0);
+    if(pTotal>0){
+      AKEYS.forEach(k=>{
+        G.portfolio[k]=Math.max(0,G.portfolio[k]-(fees*(G.portfolio[k]/pTotal)));
+      });
+    }
+  }
+  // Save current alloc as previous for next round
+  G.prevAlloc={...G.alloc};
+
+  // 2) Pick macro event
   const roll=Math.random();
   let cum=0;
   const shuffled=[...EVENTS].sort(()=>Math.random()-.5);
   for(const e of shuffled){cum+=e.prob;if(roll<cum){result.event=e;break;}}
 
-  // 2) Compute returns per asset
+  // 3) Compute returns per asset
   for(const k of AKEYS){
     const a=ASSETS[k];
     let mean=a.mean, vol=a.vol;
@@ -244,8 +341,10 @@ function simYear(){
     let r=mean+vol*randn();
     if(k==='crypto'&&Math.random()<.05)r=rand(.5,2.5);
     if(k==='gamble'){
-      if(Math.random()<.04)r=rand(1,4);
-      else if(Math.random()<.2)r=rand(-.8,-.3);
+      // Gambling loses most of the time
+      if(Math.random()<.03)r=rand(1,4); // 3% chance of big win
+      else if(Math.random()<.40)r=rand(-.8,-.3); // 40% chance of big loss
+      else r=rand(-.3,-.05); // usually loses
     }
     r=clamp(r,a.min,a.max);
     result.returns[k]=r;
@@ -258,7 +357,7 @@ function simYear(){
     G.portfolio[k]=Math.max(0,G.portfolio[k]+gain);
   }
 
-  // 3) Add income
+  // 4) Add income
   const income=G.salary;
   const totalAlloc=AKEYS.reduce((s,k)=>s+G.alloc[k],0)||100;
   for(const k of AKEYS){
@@ -267,7 +366,7 @@ function simYear(){
     G.totalContrib+=income*share;
   }
 
-  // 4) Simulate AI players
+  // 5) Simulate AI players
   G.aiScores.forEach(p=>{
     let r;
     switch(p.style){
@@ -327,6 +426,23 @@ function benchmarks(){
   });
 }
 
+/* Buy & hold benchmark (keeps initial allocation, no trading) */
+function buyAndHold(){
+  const start=10000, inc=1500;
+  // Simulate buy-and-hold with initial allocation weights
+  const initW={eq:.30,bond:.15,cash:.05,fd:.20,crypto:.20,gamble:.10};
+  let v=start;
+  for(let i=0;i<G.turn;i++){
+    let blendedR=0;
+    for(const k of AKEYS){
+      const yr=G.yearReturns[i];
+      if(yr)blendedR+=initW[k]*(yr[k]||0);
+    }
+    v=v*(1+blendedR)+inc;
+  }
+  return Math.round(v);
+}
+
 function getRank(nw){
   let r=RANKS[0];
   for(const rk of RANKS)if(nw>=rk.t)r=rk;
@@ -344,22 +460,12 @@ function sharpe(){
   return((avg-.075)/std);
 }
 
-function maxDrawdown(){
-  let peak=0,dd=0;
-  for(const v of G.history){
-    if(v>peak)peak=v;
-    const d=(peak-v)/peak;
-    if(d>dd)dd=d;
-  }
-  return dd;
-}
-
 function calcScore(nw,sh){
   const totalRet=((nw/10000)-1);
   return Math.max(0,Math.round(totalRet*100*Math.max(0,sh)*10));
 }
 
-/* ===== IN-MEMORY LEADERBOARD (persists during session) ===== */
+/* ===== IN-MEMORY LEADERBOARD ===== */
 let _bestScore=null;
 function getBestScore(){return _bestScore;}
 function saveBestScore(entry){
@@ -373,15 +479,16 @@ function tickerHTML(){
     const arrow=d==='up'?'▲':d==='down'?'▼':'●';
     return`<span class="ticker-item"><span class="sym">${t.sym}</span> <span class="${d}">${arrow} ${t.val()}</span></span>`;
   }).join('');
-  return`<div class="ticker-track">${items}${items}</div>`;
+  // Triple the items for seamless loop
+  return`<div class="ticker-track">${items}${items}${items}</div>`;
 }
 
-/* ===== HEADLINES HTML ===== */
-function headlinesHTML(){
-  const picked=[];
-  const shuffled=[...SCROLLING_HEADLINES].sort(()=>Math.random()-.5);
-  for(let i=0;i<4;i++)picked.push(shuffled[i]);
-  return picked.map(h=>`<div class="headline-item ${h.type}">📰 ${h.text}</div>`).join('');
+/* ===== NEWS CAROUSEL HTML ===== */
+function newsCarouselHTML(){
+  const news=generateNewsCarousel();
+  const items=news.map(n=>`<div class="news-carousel-item ${n.type}"><span class="news-dot">●</span> ${n.text}</div>`).join('');
+  // Triple for seamless infinite scroll
+  return`<div class="news-carousel-track">${items}${items}${items}</div>`;
 }
 
 /* ===== RENDER: TITLE ===== */
@@ -393,7 +500,7 @@ function renderTitle(){
     <div class="title-content">
       <div class="title-presents">BANKERX PRESENTS</div>
       <div class="title-name">Wealth<span>Quest</span></div>
-      <div class="title-tagline">Build wealth. Beat the market. Learn investing through an immersive investing simulation.</div>
+      <div class="title-tagline">Build wealth. Beat the market. Master investing.</div>
       <div class="title-config">
         <div class="config-label">Investment Horizon</div>
         <div class="config-row" id="hz-opts">
@@ -404,7 +511,7 @@ function renderTitle(){
       </div>
       <button class="btn-play" id="btn-start">Start Investing</button>
       <div class="title-footer">
-        <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">Created with Perplexity Computer</a>
+        <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">Powered by Perplexity Computer</a>
       </div>
     </div>
   </div>`;
@@ -423,6 +530,9 @@ function renderGame(){
   const total=AKEYS.reduce((s,k)=>s+G.alloc[k],0);
   const ok=total===100;
   const isEnd=G.turn>=G.horizon;
+  const riskProfile=calcRiskProfile(G.alloc);
+  const allocChanged=hasAllocChanged();
+  const estFees=allocChanged?calcTradingFees():0;
 
   app.innerHTML=`
   <div class="screen game-screen">
@@ -446,6 +556,10 @@ function renderGame(){
           <div class="alloc-total ${ok?'ok':total>100?'over':'under'}">${total}%</div>
         </div>
         <div id="alloc-warn-slot"></div>
+        <div class="risk-indicator" id="risk-ind">
+          <span class="ri-emoji">${riskProfile.emoji}</span>
+          <span class="ri-label" style="color:${riskProfile.color}">${riskProfile.label}</span>
+        </div>
         <div class="alloc-bar" id="abar">
           ${AKEYS.map(k=>`<div class="alloc-seg bg-${ASSETS[k].cls}" style="width:${G.alloc[k]}%"></div>`).join('')}
         </div>
@@ -463,8 +577,12 @@ function renderGame(){
             </div>`;
           }).join('')}
         </div>
+        <div class="fee-notice" id="fee-notice" style="display:${allocChanged?'flex':'none'}">
+          <span>💸</span>
+          <span>Rebalancing fee: ~${R(estFees)} (0.5% of traded amount)</span>
+        </div>
       </div>
-      <div class="headlines-feed">${headlinesHTML()}</div>
+      <div class="news-carousel">${newsCarouselHTML()}</div>
     </div>
     <div class="game-footer">
       <button class="btn-advance" id="btn-go" ${!ok||isEnd?'disabled':''}>${isEnd?'View Final Results':'⚡ Advance Year'}</button>
@@ -509,9 +627,30 @@ function updateAllocUI(){
   const warnSlot=$('alloc-warn-slot');
   if(warnSlot){
     if(total!==100){
-      warnSlot.innerHTML=`<div class="alloc-warn">⚠️ Portfolio weightings must equal 100%</div>`;
+      warnSlot.innerHTML=`<div class="alloc-warn">\u26A0\uFE0F Portfolio weightings must equal 100%</div>`;
     }else{
       warnSlot.innerHTML='';
+    }
+  }
+  // Update risk indicator
+  const riskProfile=calcRiskProfile(G.alloc);
+  const ri=$('risk-ind');
+  if(ri){
+    ri.querySelector('.ri-emoji').textContent=riskProfile.emoji;
+    const label=ri.querySelector('.ri-label');
+    label.textContent=riskProfile.label;
+    label.style.color=riskProfile.color;
+  }
+  // Update fee notice
+  const allocChanged=hasAllocChanged();
+  const feeNotice=$('fee-notice');
+  if(feeNotice){
+    if(allocChanged){
+      const estFees=calcTradingFees();
+      feeNotice.style.display='flex';
+      feeNotice.querySelector('span:last-child').textContent=`Rebalancing fee: ~${R(estFees)} (0.5% of traded amount)`;
+    }else{
+      feeNotice.style.display='none';
     }
   }
   const btn=$('btn-go');
@@ -549,6 +688,8 @@ function renderYearEnd(result){
         </div>
       </div>
 
+      ${result.fees>0?`<div class="fee-deducted">💸 Trading fees deducted: ${R(result.fees)}</div>`:''}
+
       <table class="perf-table">
         <tr><th>Asset</th><th>Return</th><th>Value</th><th>What happened</th></tr>
         ${AKEYS.map(k=>{
@@ -570,7 +711,7 @@ function renderYearEnd(result){
     </div>
   </div>`;
 
-  // Always show a decision popup
+  // Show decision popup
   const dec=pickDecision();
   if(dec){
     setTimeout(()=>showDecision(dec),600);
@@ -582,7 +723,7 @@ function renderYearEnd(result){
   };
 }
 
-/* ===== SHOW DECISION ===== */
+/* ===== SHOW DECISION (realistic outcomes) ===== */
 function showDecision(dec){
   const overlay=document.createElement('div');
   overlay.className='decision-overlay';
@@ -608,7 +749,18 @@ function showDecision(dec){
         G.portfolio[k]=Math.max(0,G.portfolio[k]-(dec.yesCost*(G.portfolio[k]/total)));
       });
     }
-    const ret=rand(dec.yesReturn[0],dec.yesReturn[1]);
+
+    // Use loseProb to determine if the decision loses money
+    let ret;
+    const loseProb=dec.loseProb||0.5;
+    if(Math.random()<loseProb){
+      // Loses money — pick from negative range
+      ret=rand(dec.yesReturn[0],Math.min(0,dec.yesReturn[0]*0.3));
+    }else{
+      // Wins — pick from positive range
+      ret=rand(0.01,dec.yesReturn[1]);
+    }
+
     const gain=dec.yesCost>0?dec.yesCost*ret:G.portfolio[dec.yesAsset]*.05*ret;
     G.portfolio[dec.yesAsset]=Math.max(0,G.portfolio[dec.yesAsset]+gain);
     G.capital=Object.values(G.portfolio).reduce((a,b)=>a+b,0);
@@ -639,6 +791,8 @@ function renderFinalResults(){
   const ear=annRet*100;
   const bench=benchmarks();
   const score=calcScore(nw,sh);
+  const bnh=buyAndHold();
+  const beatBnH=nw>bnh;
 
   // Save best score
   saveBestScore({score,nw:Math.round(nw),horizon:G.horizon,date:new Date().toISOString().slice(0,10)});
@@ -655,6 +809,10 @@ function renderFinalResults(){
     {name:'You',emoji:'🎮',nw:Math.round(nw),you:true}];
   players.sort((a,b)=>b.nw-a.nw);
 
+  // Buy & hold comparison
+  const bnhDiff=nw-bnh;
+  const bnhPct=((nw/bnh)-1)*100;
+
   app.innerHTML=`
   <div class="screen results-screen">
     <div class="res-header">
@@ -667,6 +825,14 @@ function renderFinalResults(){
         <div>
           <div class="rank-name">${rank.name}</div>
           <div class="rank-desc">Final Net Worth: ${R(nw)}</div>
+        </div>
+      </div>
+
+      <div class="bnh-card ${beatBnH?'beat':'lost'}">
+        <div class="bnh-icon">${beatBnH?'🎯':'📉'}</div>
+        <div class="bnh-body">
+          <div class="bnh-title">You ${beatBnH?'outperformed':'underperformed'} a simple buy & hold strategy</div>
+          <div class="bnh-detail">Buy & hold would have returned ${R(bnh)}. You ${beatBnH?'beat':'trailed'} it by ${R(Math.abs(bnhDiff))} (${bnhPct>=0?'+':''}${bnhPct.toFixed(1)}%).${G.totalFees>0?' Total trading fees paid: '+R(G.totalFees)+'.':''}</div>
         </div>
       </div>
 
@@ -701,6 +867,7 @@ function renderFinalResults(){
       <div class="bench-card">
         <div class="bench-title">📊 How You Compare</div>
         <div class="bench-row"><div class="bench-label">Your Result</div><div class="bench-val" style="color:var(--g)">${R(nw)}</div></div>
+        <div class="bench-row"><div class="bench-label">Buy & Hold (No Changes)</div><div class="bench-val" style="color:var(--y)">${R(bnh)}</div></div>
         ${bench.map(b=>`<div class="bench-row"><div class="bench-label">${b.label}</div><div class="bench-val" style="color:var(--b)">${R(b.value)}</div></div>`).join('')}
       </div>
 
@@ -723,9 +890,8 @@ function renderFinalResults(){
         <a href="https://www.bankerx.org/join" target="_blank" rel="noopener noreferrer" class="nl-btn">Join BANKERX →</a>
       </div>
 
-      <button class="btn-share" id="btn-share">📤 Share This Game With a Friend</button>
-      <button class="btn-replay" id="btn-again">Play Again</button>
-      <div class="pplx-foot"><a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">Created with Perplexity Computer</a></div>
+      <button class="btn-replay-blue" id="btn-again">🔄 Play Again</button>
+      <div class="pplx-foot"><a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">Powered by Perplexity Computer</a></div>
     </div>
   </div>`;
 
@@ -760,19 +926,6 @@ function renderFinalResults(){
       });
     }
   },100);
-
-  $('btn-share').onclick=()=>{
-    const text=`I just played BANKERX WealthQuest and turned R10,000 into ${R(nw)} over ${G.horizon} years! Can you beat my score?\n\n${SHARE_URL}`;
-    if(navigator.share){
-      navigator.share({title:'BANKERX WealthQuest',text,url:SHARE_URL}).catch(()=>{});
-    }else{
-      navigator.clipboard.writeText(text).then(()=>{
-        const btn=$('btn-share');
-        btn.textContent='✅ Link Copied!';
-        setTimeout(()=>{btn.textContent='📤 Share This Game With a Friend'},2000);
-      }).catch(()=>{});
-    }
-  };
 
   $('btn-again').onclick=()=>renderTitle();
 }
