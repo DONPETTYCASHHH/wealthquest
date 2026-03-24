@@ -640,7 +640,7 @@ function renderFinalResults(){
   const bench=benchmarks();
   const score=calcScore(nw,sh);
 
-  // Save to localStorage
+  // Save best score
   saveBestScore({score,nw:Math.round(nw),horizon:G.horizon,date:new Date().toISOString().slice(0,10)});
   const best=getBestScore();
 
