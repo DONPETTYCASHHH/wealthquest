@@ -359,17 +359,11 @@ function calcScore(nw,sh){
   return Math.max(0,Math.round(totalRet*100*Math.max(0,sh)*10));
 }
 
-/* ===== LOCAL STORAGE LEADERBOARD ===== */
-function getBestScore(){
-  try{return JSON.parse(localStorage.getItem('wq_best'))||null}catch{return null}
-}
+/* ===== IN-MEMORY LEADERBOARD (persists during session) ===== */
+let _bestScore=null;
+function getBestScore(){return _bestScore;}
 function saveBestScore(entry){
-  try{
-    const best=getBestScore();
-    if(!best||entry.score>best.score){
-      localStorage.setItem('wq_best',JSON.stringify(entry));
-    }
-  }catch{}
+  if(!_bestScore||entry.score>_bestScore.score)_bestScore=entry;
 }
 
 /* ===== TICKER HTML ===== */
