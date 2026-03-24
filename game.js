@@ -12,28 +12,28 @@ function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
 const SHARE_URL='https://www.perplexity.ai/computer/a/bankerx-wealthquest-2NF0O82kTZGfLh_R_8GH5w';
 
 /* ===== TRADING FEE CONFIG ===== */
-const TRADING_FEE_RATE=0.005; // 0.5% of traded amount (realistic brokerage + spread)
+const TRADING_FEE_RATE=0.015; // 1.5% of traded amount (brokerage, spread, STT & timing costs)
 
 /* ===== ASSET PROFILES (SA market performance) ===== */
 const ASSETS={
   eq:{name:'Stocks',icon:'📈',color:'#4a9ef0',cls:'eq',
     mean:.12,vol:.17,min:-.35,max:.42,
-    desc:'ETFs & Index funds',risk:'High risk',riskScore:3},
+    desc:'ETFs & Index funds',riskScore:3},
   bond:{name:'Bonds',icon:'🏛️',color:'#c070ff',cls:'bond',
     mean:.095,vol:.04,min:-.05,max:.16,
-    desc:'Government bonds',risk:'Low-med risk',riskScore:1},
+    desc:'Government issued',riskScore:1},
   cash:{name:'Cash',icon:'💵',color:'#8888a0',cls:'cash',
     mean:0,vol:.005,min:-.08,max:.01,
-    desc:'In case of emergency',risk:'Inflation risk',riskScore:0},
+    desc:'In case of emergency',riskScore:0},
   fd:{name:'Savings',icon:'🏦',color:'#00ddff',cls:'fd',
     mean:.075,vol:.01,min:.04,max:.10,
-    desc:'Fixed deposits',risk:'Low risk',riskScore:0.5},
+    desc:'Fixed deposits',riskScore:0.5},
   crypto:{name:'Crypto',icon:'₿',color:'#ff8844',cls:'crypto',
     mean:.20,vol:.60,min:-.70,max:3.0,
-    desc:'Bitcoin, Ethereum & altcoins',risk:'Extreme risk',riskScore:5},
+    desc:'Large cap crypto',riskScore:5},
   gamble:{name:'Gambling',icon:'🎰',color:'#ff3355',cls:'gamble',
     mean:-.12,vol:.50,min:-.90,max:4.0,
-    desc:'The house always wins',risk:'Negative EV',riskScore:6}
+    desc:'The house always wins',riskScore:6}
 };
 const AKEYS=Object.keys(ASSETS);
 
@@ -130,7 +130,17 @@ const DECISIONS_BY_RISK=[
     {emoji:'🏦',title:'Fixed Deposit Special',desc:'Bank offering 9.5% fixed deposit for 12 months. Lock in R500?',risk:'low',
       yesCost:500,yesAsset:'fd',yesReturn:[.085,.10],loseProb:.05,lesson:'Fixed deposits are safe and predictable.'},
     {emoji:'⚡',title:'Eskom Bond',desc:'Government-backed Eskom bond paying 11%. Invest R400?',risk:'low',
-      yesCost:400,yesAsset:'bond',yesReturn:[.09,.12],loseProb:.10,lesson:'Government-backed bonds are safer, but carry credit risk.'}
+      yesCost:400,yesAsset:'bond',yesReturn:[.09,.12],loseProb:.10,lesson:'Government-backed bonds are safer, but carry credit risk.'},
+    {emoji:'🏧',title:'Money Market Fund',desc:'Your bank offers a money market account at 8.5%. Park R600 there?',risk:'low',
+      yesCost:600,yesAsset:'fd',yesReturn:[.07,.09],loseProb:.05,lesson:'Money market funds are low risk but barely beat inflation.'},
+    {emoji:'📋',title:'Tax-Free Savings',desc:'Open a tax-free savings account and invest R500 in a balanced fund?',risk:'low',
+      yesCost:500,yesAsset:'eq',yesReturn:[.05,.12],loseProb:.12,lesson:'Tax-free accounts let your returns compound without tax drag.'},
+    {emoji:'🛡️',title:'Retirement Annuity Top-Up',desc:'Financial advisor suggests adding R400 to your RA for the tax deduction.',risk:'low',
+      yesCost:400,yesAsset:'bond',yesReturn:[.06,.10],loseProb:.08,lesson:'Retirement annuities offer tax benefits but lock up your money.'},
+    {emoji:'🏦',title:'Notice Deposit',desc:'32-day notice deposit at 9%. Lock R500?',risk:'low',
+      yesCost:500,yesAsset:'fd',yesReturn:[.08,.095],loseProb:.03,lesson:'Notice deposits offer slightly higher rates for short lock-up periods.'},
+    {emoji:'📈',title:'Satrix Top 40 ETF',desc:'Invest R500 in the Satrix Top 40 ETF tracking the JSE\'s biggest companies?',risk:'low',
+      yesCost:500,yesAsset:'eq',yesReturn:[.04,.14],loseProb:.18,lesson:'Index ETFs give you broad market exposure at very low cost.'}
   ],
   /* Medium risk — mid years */
   [
@@ -139,7 +149,19 @@ const DECISIONS_BY_RISK=[
     {emoji:'🏠',title:'Property REIT',desc:'A SA property fund offers 8% dividends. Invest R600?',risk:'med',
       yesCost:600,yesAsset:'eq',yesReturn:[-.08,.18],loseProb:.30,lesson:'REITs offer steady income but are rate-sensitive.'},
     {emoji:'💎',title:'Crypto Staking',desc:'Stake your crypto for 15% APY. Locks funds for 6 months.',risk:'med',
-      yesCost:0,yesAsset:'crypto',yesReturn:[-.15,.20],loseProb:.35,lesson:'Staking earns yield, but lock-ups add liquidity risk.'}
+      yesCost:0,yesAsset:'crypto',yesReturn:[-.15,.20],loseProb:.35,lesson:'Staking earns yield, but lock-ups add liquidity risk.'},
+    {emoji:'🌍',title:'Offshore ETF',desc:'Move R600 into a USD-denominated global ETF for diversification?',risk:'med',
+      yesCost:600,yesAsset:'eq',yesReturn:[-.10,.25],loseProb:.35,lesson:'Offshore exposure reduces SA-specific risk but adds currency risk.'},
+    {emoji:'⛏️',title:'Mining Stock',desc:'A platinum miner is trading below book value. Buy R500 worth?',risk:'med',
+      yesCost:500,yesAsset:'eq',yesReturn:[-.25,.40],loseProb:.40,lesson:'Commodity stocks are cyclical — cheap can get cheaper.'},
+    {emoji:'🏗️',title:'Infrastructure Bond',desc:'New toll road project issuing bonds at 10.5%. Put in R400?',risk:'med',
+      yesCost:400,yesAsset:'bond',yesReturn:[-.05,.12],loseProb:.25,lesson:'Infrastructure bonds can be solid but carry project completion risk.'},
+    {emoji:'📱',title:'Tech Stock Tip',desc:'A colleague swears by a mid-cap tech company. Invest R500?',risk:'med',
+      yesCost:500,yesAsset:'eq',yesReturn:[-.30,.50],loseProb:.45,lesson:'Stock tips from friends are rarely based on proper analysis.'},
+    {emoji:'🔋',title:'Renewable Energy Fund',desc:'Green energy fund promising 12% returns. Invest R600?',risk:'med',
+      yesCost:600,yesAsset:'eq',yesReturn:[-.12,.22],loseProb:.35,lesson:'Thematic funds can outperform but carry concentration risk.'},
+    {emoji:'🏘️',title:'Property Crowdfunding',desc:'An online platform lets you invest R400 in a Sandton apartment block.',risk:'med',
+      yesCost:400,yesAsset:'eq',yesReturn:[-.15,.20],loseProb:.40,lesson:'Property crowdfunding is illiquid and platforms can fail.'}
   ],
   /* High risk — later years (lose more often than win) */
   [
@@ -148,7 +170,19 @@ const DECISIONS_BY_RISK=[
     {emoji:'⚽',title:'Weekend Football Bet',desc:'Your mate says Chiefs vs Pirates is a sure thing. Bet R500?',risk:'high',
       yesCost:500,yesAsset:'gamble',yesReturn:[-.99,3.0],loseProb:.85,lesson:'Sports betting is entertainment, not investing.'},
     {emoji:'🎰',title:'Casino Night',desc:'Friends hitting the casino. Take R300 gambling money?',risk:'high',
-      yesCost:300,yesAsset:'gamble',yesReturn:[-.99,8.0],loseProb:.88,lesson:'Casino games have a built-in house edge.'}
+      yesCost:300,yesAsset:'gamble',yesReturn:[-.99,8.0],loseProb:.88,lesson:'Casino games have a built-in house edge.'},
+    {emoji:'🐎',title:'Horse Racing Tip',desc:'A "sure thing" at the Durban July. Put R400 on it?',risk:'high',
+      yesCost:400,yesAsset:'gamble',yesReturn:[-.99,6.0],loseProb:.85,lesson:'Horse racing odds are set by bookmakers — they always profit.'},
+    {emoji:'🪙',title:'New Crypto Token Launch',desc:'Pre-sale for a new DeFi token. Get in early with R500?',risk:'high',
+      yesCost:500,yesAsset:'crypto',yesReturn:[-.95,8.0],loseProb:.82,lesson:'Most new token launches lose 90%+ within months.'},
+    {emoji:'📉',title:'Short the Market',desc:'You think a crash is coming. Short the JSE with R600?',risk:'high',
+      yesCost:600,yesAsset:'eq',yesReturn:[-.80,3.0],loseProb:.75,lesson:'Timing the market is nearly impossible. Most short sellers lose.'},
+    {emoji:'🎯',title:'Sports Accumulator',desc:'6-leg accumulator bet with 50:1 odds. Put R200 on it?',risk:'high',
+      yesCost:200,yesAsset:'gamble',yesReturn:[-.99,50],loseProb:.92,lesson:'Accumulators look tempting but multiply the house edge.'},
+    {emoji:'💊',title:'Biotech Penny Stock',desc:'Small pharma company claims breakthrough drug. Invest R400?',risk:'high',
+      yesCost:400,yesAsset:'eq',yesReturn:[-.85,6.0],loseProb:.80,lesson:'Biotech penny stocks fail clinical trials more often than not.'},
+    {emoji:'🎮',title:'NFT Collection',desc:'A friend says this NFT collection will be the next big thing. Buy for R500?',risk:'high',
+      yesCost:500,yesAsset:'crypto',yesReturn:[-.95,4.0],loseProb:.85,lesson:'Most NFTs lose 90%+ of their value within a year.'}
   ],
   /* Extreme risk — final years (almost always lose) */
   [
@@ -157,7 +191,19 @@ const DECISIONS_BY_RISK=[
     {emoji:'🔥',title:'Leveraged Crypto Trade',desc:'10x leverage on Bitcoin. Could double or lose everything. R800?',risk:'extreme',
       yesCost:800,yesAsset:'crypto',yesReturn:[-.95,10],loseProb:.85,lesson:'Leverage amplifies gains AND losses. Most traders lose everything.'},
     {emoji:'💰',title:'All-in on Penny Stock',desc:'A penny stock tip from a stranger online. Throw R600 at it?',risk:'extreme',
-      yesCost:600,yesAsset:'eq',yesReturn:[-.95,8.0],loseProb:.90,lesson:'Penny stocks are the most manipulated securities on the market.'}
+      yesCost:600,yesAsset:'eq',yesReturn:[-.95,8.0],loseProb:.90,lesson:'Penny stocks are the most manipulated securities on the market.'},
+    {emoji:'🃏',title:'Online Poker Tournament',desc:'R500 buy-in for an online poker tournament. Feeling lucky?',risk:'extreme',
+      yesCost:500,yesAsset:'gamble',yesReturn:[-.99,20],loseProb:.90,lesson:'Professional poker players make up <5% of tournament winners.'},
+    {emoji:'🌪️',title:'Forex Day Trading',desc:'Open a forex account and trade ZAR/USD with 50x leverage. R700?',risk:'extreme',
+      yesCost:700,yesAsset:'gamble',yesReturn:[-.99,15],loseProb:.88,lesson:'Over 80% of retail forex traders lose money within 12 months.'},
+    {emoji:'💎',title:'Unregulated Crypto Exchange',desc:'A new offshore exchange offers 100x leverage. Deposit R600?',risk:'extreme',
+      yesCost:600,yesAsset:'crypto',yesReturn:[-.99,25],loseProb:.92,lesson:'Unregulated exchanges frequently exit-scam with customer funds.'},
+    {emoji:'🏎️',title:'"Investment" Car Scheme',desc:'A WhatsApp group promises 50% monthly returns on luxury car rentals. Invest R800?',risk:'extreme',
+      yesCost:800,yesAsset:'gamble',yesReturn:[-.99,2.0],loseProb:.95,lesson:'If it sounds too good to be true, it\'s a Ponzi scheme.'},
+    {emoji:'📊',title:'Binary Options',desc:'A flashy app lets you bet on 60-second stock movements. Try R300?',risk:'extreme',
+      yesCost:300,yesAsset:'gamble',yesReturn:[-.99,8.0],loseProb:.90,lesson:'Binary options are banned in most countries. The house always wins.'},
+    {emoji:'🦍',title:'Reddit Meme Stock',desc:'An overseas meme stock is squeezing. YOLO R500 on it?',risk:'extreme',
+      yesCost:500,yesAsset:'eq',yesReturn:[-.90,12],loseProb:.85,lesson:'Meme stock squeezes are over by the time retail investors hear about them.'}
   ]
 ];
 
@@ -276,7 +322,8 @@ function newGame(horizon){
     portfolio:{eq:3000,bond:1500,cash:500,fd:2000,crypto:2000,gamble:1000},
     history:[10000], yearReturns:[], events:[], decisions:[],
     aiScores:AI_PLAYERS.map(p=>({...p,nw:10000})),
-    totalContrib:0, yearNotes:[], totalFees:0
+    totalContrib:0, yearNotes:[], totalFees:0,
+    firstAlloc:null // captured after first advance
   };
   renderGame();
 }
@@ -397,7 +444,7 @@ function simYear(){
 
 /* ===== PICK DECISION (escalating risk) ===== */
 function pickDecision(){
-  if(Math.random()<.6){
+  if(Math.random()<.7){
     const progress=G.turn/G.horizon;
     let tier=0;
     if(progress>.25)tier=1;
@@ -426,17 +473,19 @@ function benchmarks(){
   });
 }
 
-/* Buy & hold benchmark (keeps initial allocation, no trading) */
+/* Buy & hold benchmark — uses the player's FIRST round allocation, no rebalancing, no fees */
 function buyAndHold(){
   const start=10000, inc=1500;
-  // Simulate buy-and-hold with initial allocation weights
-  const initW={eq:.30,bond:.15,cash:.05,fd:.20,crypto:.20,gamble:.10};
+  // Use player's first-round allocation weights (captured at first advance)
+  const fa=G.firstAlloc||{eq:30,bond:15,cash:5,fd:20,crypto:20,gamble:10};
+  const total=AKEYS.reduce((s,k)=>s+fa[k],0)||100;
+  const w={}; AKEYS.forEach(k=>{w[k]=fa[k]/total});
   let v=start;
   for(let i=0;i<G.turn;i++){
     let blendedR=0;
     for(const k of AKEYS){
       const yr=G.yearReturns[i];
-      if(yr)blendedR+=initW[k]*(yr[k]||0);
+      if(yr)blendedR+=w[k]*(yr[k]||0);
     }
     v=v*(1+blendedR)+inc;
   }
@@ -496,7 +545,7 @@ function renderTitle(){
   let sel=10;
   app.innerHTML=`
   <div class="screen title-screen">
-    <div class="title-bg"><img src="./splash.png" alt="Bull vs Bear"></div>
+    <div class="title-bg"><img src="./splash.jpg" alt="Bull vs Bear"></div>
     <div class="title-content">
       <div class="title-presents">BANKERX PRESENTS</div>
       <div class="title-name">Wealth<span>Quest</span></div>
@@ -571,7 +620,7 @@ function renderGame(){
                 <div class="asset-name"><span class="asset-icon">${a.icon}</span> ${a.name}</div>
                 <div class="asset-pct c-${a.cls}">${G.alloc[k]}%</div>
               </div>
-              <div class="asset-meta">${a.desc} · ${a.risk}</div>
+              <div class="asset-meta">${a.desc}</div>
               <input type="range" class="asset-slider ${a.cls}" data-k="${k}" min="0" max="100" step="5" value="${G.alloc[k]}">
               <div class="asset-meta">${R(G.portfolio[k])}</div>
             </div>`;
@@ -579,7 +628,7 @@ function renderGame(){
         </div>
         <div class="fee-notice" id="fee-notice" style="display:${allocChanged?'flex':'none'}">
           <span>💸</span>
-          <span>Rebalancing fee: ~${R(estFees)} (0.5% of traded amount)</span>
+          <span>Rebalancing fee: ~${R(estFees)} (fees & timing costs)</span>
         </div>
       </div>
       <div class="news-carousel">${newsCarouselHTML()}</div>
@@ -605,6 +654,8 @@ function renderGame(){
   }else{
     $('btn-go').onclick=()=>{
       if(AKEYS.reduce((s,k)=>s+G.alloc[k],0)!==100)return;
+      // Capture first-round allocation for buy & hold benchmark
+      if(!G.firstAlloc) G.firstAlloc={...G.alloc};
       const pTotal=Object.values(G.portfolio).reduce((a,b)=>a+b,0);
       AKEYS.forEach(k=>{G.portfolio[k]=pTotal*(G.alloc[k]/100)});
       const result=simYear();
@@ -648,7 +699,7 @@ function updateAllocUI(){
     if(allocChanged){
       const estFees=calcTradingFees();
       feeNotice.style.display='flex';
-      feeNotice.querySelector('span:last-child').textContent=`Rebalancing fee: ~${R(estFees)} (0.5% of traded amount)`;
+      feeNotice.querySelector('span:last-child').textContent=`Rebalancing fee: ~${R(estFees)} (fees & timing costs)`;
     }else{
       feeNotice.style.display='none';
     }
@@ -832,7 +883,7 @@ function renderFinalResults(){
         <div class="bnh-icon">${beatBnH?'🎯':'📉'}</div>
         <div class="bnh-body">
           <div class="bnh-title">You ${beatBnH?'outperformed':'underperformed'} a simple buy & hold strategy</div>
-          <div class="bnh-detail">Buy & hold would have returned ${R(bnh)}. You ${beatBnH?'beat':'trailed'} it by ${R(Math.abs(bnhDiff))} (${bnhPct>=0?'+':''}${bnhPct.toFixed(1)}%).${G.totalFees>0?' Total trading fees paid: '+R(G.totalFees)+'.':''}</div>
+          <div class="bnh-detail">Buy & hold means keeping your Year 1 allocation and never changing it — no rebalancing, no fees. That would have returned ${R(bnh)}. You ${beatBnH?'beat':'trailed'} it by ${R(Math.abs(bnhDiff))} (${bnhPct>=0?'+':''}${bnhPct.toFixed(1)}%).${G.totalFees>0?' Total trading fees paid: '+R(G.totalFees)+'.':''}</div>
         </div>
       </div>
 
