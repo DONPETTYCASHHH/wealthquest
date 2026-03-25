@@ -9,7 +9,7 @@ const pick=a=>a[Math.floor(Math.random()*a.length)];
 function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
 function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
 
-const SHARE_URL='https://www.perplexity.ai/computer/a/wealthquest-2NF0O82kTZGfLh_R_8GH5w';
+const SHARE_URL='https://wealthquest.pages.dev/';
 
 /* ===== REBALANCING PENALTY CONFIG ===== */
 const REBALANCE_PENALTY_RATE=0.01; // 1% of total portfolio value (fees, admin & timing costs)
