@@ -11,8 +11,8 @@ function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v))}
 
 const SHARE_URL='https://www.perplexity.ai/computer/a/wealthquest-2NF0O82kTZGfLh_R_8GH5w';
 
-/* ===== TRADING FEE CONFIG ===== */
-const TRADING_FEE_RATE=0.015; // 1.5% of traded amount (brokerage, spread, STT & timing costs)
+/* ===== REBALANCING PENALTY CONFIG ===== */
+const REBALANCE_PENALTY_RATE=0.01; // 1% of total portfolio value (fees, admin & timing costs)
 
 /* ===== ASSET PROFILES (SA market performance) ===== */
 const ASSETS={
@@ -39,6 +39,31 @@ const AKEYS=Object.keys(ASSETS);
 
 /* SA inflation ~5-6% */
 const SA_INFLATION=.055;
+
+/* ===== RISK LABEL FOR AI PLAYERS ===== */
+function aiRiskLabel(style){
+  const map={
+    balanced:{label:'Balanced',color:'var(--g)',emoji:'⚖️'},
+    aggressive:{label:'Risky',color:'var(--orange)',emoji:'⚡'},
+    conservative:{label:'Conservative',color:'#00ddff',emoji:'🧘'},
+    crypto_bro:{label:'Extremely Risky',color:'var(--r)',emoji:'🔥'},
+    gambler:{label:'Extremely Risky',color:'var(--r)',emoji:'🔥'},
+    smart:{label:'Balanced',color:'var(--g)',emoji:'⚖️'},
+    bonds_heavy:{label:'Conservative',color:'#00ddff',emoji:'🧘'},
+    yolo:{label:'Extremely Risky',color:'var(--r)',emoji:'🔥'},
+    index:{label:'Balanced',color:'var(--g)',emoji:'⚖️'}
+  };
+  return map[style]||{label:'Balanced',color:'var(--g)',emoji:'⚖️'};
+}
+
+/* Average risk profile across all rounds played */
+function avgRiskProfile(){
+  if(!G.allocHistory||G.allocHistory.length===0) return calcRiskProfile(G.alloc);
+  // Average each asset's allocation across all rounds
+  const avg={};
+  AKEYS.forEach(k=>{ avg[k]=G.allocHistory.reduce((s,a)=>s+a[k],0)/G.allocHistory.length; });
+  return calcRiskProfile(avg);
+}
 
 /* ===== RISK PROFILE CALCULATOR ===== */
 function calcRiskProfile(alloc){
@@ -322,26 +347,17 @@ function newGame(horizon){
     portfolio:{eq:3000,bond:1500,cash:500,fd:2000,crypto:2000,gamble:1000},
     history:[10000], yearReturns:[], events:[], decisions:[],
     aiScores:AI_PLAYERS.map(p=>({...p,nw:10000})),
-    totalContrib:0, yearNotes:[], totalFees:0
+    totalContrib:0, yearNotes:[], totalFees:0,
+    allocHistory:[] // track allocations each round for avg risk
   };
   renderGame();
 }
 
-/* ===== CALCULATE TRADING FEES ===== */
-function calcTradingFees(){
-  // Fee based on the total amount being traded (rebalanced)
+/* ===== CALCULATE REBALANCING PENALTY ===== */
+function calcRebalancePenalty(){
+  // 1% of total portfolio value when allocation changes
   const pTotal=Object.values(G.portfolio).reduce((a,b)=>a+b,0);
-  const totalAlloc=AKEYS.reduce((s,k)=>s+G.alloc[k],0)||100;
-  let traded=0;
-  for(const k of AKEYS){
-    const currentPct=(G.portfolio[k]/pTotal)*100;
-    const targetPct=(G.alloc[k]/totalAlloc)*100;
-    const diff=Math.abs(targetPct-currentPct);
-    traded+=pTotal*(diff/100);
-  }
-  // Only half is actual trades (buy side = sell side)
-  const actualTraded=traded/2;
-  return actualTraded*TRADING_FEE_RATE;
+  return pTotal*REBALANCE_PENALTY_RATE;
 }
 
 function hasAllocChanged(){
@@ -353,19 +369,21 @@ function simYear(){
   G.turn++;
   const result={event:null,decision:null,returns:{},notes:{},fees:0};
 
-  // 1) Apply trading fees if allocation changed
+  // 1) Apply rebalancing penalty if allocation changed
   if(hasAllocChanged()){
-    const fees=calcTradingFees();
-    result.fees=fees;
-    G.totalFees+=fees;
-    // Deduct fees proportionally from all positions
+    const penalty=calcRebalancePenalty();
+    result.fees=penalty;
+    G.totalFees+=penalty;
+    // Deduct penalty proportionally from all positions
     const pTotal=Object.values(G.portfolio).reduce((a,b)=>a+b,0);
     if(pTotal>0){
       AKEYS.forEach(k=>{
-        G.portfolio[k]=Math.max(0,G.portfolio[k]-(fees*(G.portfolio[k]/pTotal)));
+        G.portfolio[k]=Math.max(0,G.portfolio[k]-(penalty*(G.portfolio[k]/pTotal)));
       });
     }
   }
+  // Track allocation for average risk calculation
+  G.allocHistory.push({...G.alloc});
   // Save current alloc as previous for next round
   G.prevAlloc={...G.alloc};
 
@@ -576,7 +594,7 @@ function renderGame(){
   const isEnd=G.turn>=G.horizon;
   const riskProfile=calcRiskProfile(G.alloc);
   const allocChanged=hasAllocChanged();
-  const estFees=allocChanged?calcTradingFees():0;
+  const estFees=allocChanged?calcRebalancePenalty():0;
 
   app.innerHTML=`
   <div class="screen game-screen">
@@ -623,7 +641,7 @@ function renderGame(){
         </div>
         <div class="fee-notice" id="fee-notice" style="display:${allocChanged?'flex':'none'}">
           <span>💸</span>
-          <span>Rebalancing fee: ~${R(estFees)} (fees & timing costs)</span>
+          <span>Rebalancing penalty: ~${R(estFees)} (fees, admin & timing costs)</span>
         </div>
       </div>
       <div class="news-carousel">${newsCarouselHTML()}</div>
@@ -691,9 +709,9 @@ function updateAllocUI(){
   const feeNotice=$('fee-notice');
   if(feeNotice){
     if(allocChanged){
-      const estFees=calcTradingFees();
+      const estFees=calcRebalancePenalty();
       feeNotice.style.display='flex';
-      feeNotice.querySelector('span:last-child').textContent=`Rebalancing fee: ~${R(estFees)} (fees & timing costs)`;
+      feeNotice.querySelector('span:last-child').textContent=`Rebalancing penalty: ~${R(estFees)} (fees, admin & timing costs)`;
     }else{
       feeNotice.style.display='none';
     }
@@ -733,7 +751,7 @@ function renderYearEnd(result){
         </div>
       </div>
 
-      ${result.fees>0?`<div class="fee-deducted">💸 Trading fees deducted: ${R(result.fees)}</div>`:''}
+      ${result.fees>0?`<div class="fee-deducted">💸 Rebalancing penalty: ${R(result.fees)} (fees, admin & timing costs)</div>`:''}
 
       <table class="perf-table">
         <tr><th>Asset</th><th>Return</th><th>Value</th><th>What happened</th></tr>
@@ -849,9 +867,13 @@ function renderFinalResults(){
   let sharpeExplain=`The Sharpe Ratio measures how much return you earned for each unit of risk you took. A ratio above 1.0 means your returns more than compensated for the volatility. Below 0 means you would've been better off in a risk-free savings account.`;
   let sharpePct=clamp((sh+1)/3*100,2,100);
 
-  // Build leaderboard with AI
-  const players=[...G.aiScores.map(p=>({name:p.name,emoji:p.emoji,nw:Math.round(p.nw),you:false})),
-    {name:'You',emoji:'🎮',nw:Math.round(nw),you:true}];
+  // Build leaderboard with AI + risk ratings
+  const playerRisk=avgRiskProfile();
+  const players=[...G.aiScores.map(p=>{
+    const rl=aiRiskLabel(p.style);
+    return{name:p.name,emoji:p.emoji,nw:Math.round(p.nw),you:false,risk:rl};
+  }),
+    {name:'You',emoji:'🎮',nw:Math.round(nw),you:true,risk:playerRisk}];
   players.sort((a,b)=>b.nw-a.nw);
 
   // 60/40 comparison
@@ -877,7 +899,7 @@ function renderFinalResults(){
         <div class="bnh-icon">${beatSF?'🎯':'📉'}</div>
         <div class="bnh-body">
           <div class="bnh-title">You ${beatSF?'outperformed':'underperformed'} a classic 60/40 portfolio</div>
-          <div class="bnh-detail">A 60/40 portfolio puts 60% in stocks and 40% in bonds — the most common balanced strategy. It would have returned ${R(sf)}. You ${beatSF?'beat':'trailed'} it by ${R(Math.abs(sfDiff))} (${sfPct>=0?'+':''}${sfPct.toFixed(1)}%).${G.totalFees>0?' Total trading fees paid: '+R(G.totalFees)+'.':''}</div>
+          <div class="bnh-detail">A 60/40 portfolio puts 60% in stocks and 40% in bonds — the most common balanced strategy. It would have returned ${R(sf)}. You ${beatSF?'beat':'trailed'} it by ${R(Math.abs(sfDiff))} (${sfPct>=0?'+':''}${sfPct.toFixed(1)}%).${G.totalFees>0?' Total rebalancing penalties paid: '+R(G.totalFees)+'.':''}</div>
         </div>
       </div>
 
@@ -923,6 +945,7 @@ function renderFinalResults(){
             <div class="lb-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':'#'+(i+1)}</div>
             <div style="font-size:16px">${p.emoji}</div>
             <div class="lb-name">${p.name}</div>
+            <div class="lb-risk" style="color:${p.risk.color}">${p.risk.emoji} ${p.risk.label}</div>
             <div class="lb-score">${R(p.nw)}</div>
           </div>
         `).join('')}
